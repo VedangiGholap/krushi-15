@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "580025191011",
+    "project_id": "krushi-firebase-vedangi",
+    "storage_bucket": "krushi-firebase-vedangi.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:580025191011:android:a02b0f325014b7f8450656",
+        "android_client_info": {
+          "package_name": "com.example.krushi_version16"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBjDukdUg_xtOvQGtGh36p1y1ZGMRAsEaY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
