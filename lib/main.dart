@@ -1,11 +1,10 @@
-// main.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'pages/role_selection.dart';
+import 'pages/role_selection.dart'; // You can have other imports for your pages and services
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp();  // Firebase initialization
   runApp(const MyApp());
 }
 
@@ -20,7 +19,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         useMaterial3: true,
       ),
-      home: const RoleSelectionPage(), // ← this is for the sake of placeholder
+      home: const RoleSelectionPage(),
       debugShowCheckedModeBanner: false,
     );
   }
