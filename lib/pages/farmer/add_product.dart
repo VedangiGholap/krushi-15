@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:krushi_version16/cloudinary_service.dart'; // Import the service here
+import 'package:krushi_version16/cloudinary_service.dart';
 
 class AddInventoryItemPage extends StatefulWidget {
   final String farmerId;
@@ -17,7 +17,7 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
   final _formKey = GlobalKey<FormState>();
 
   String? productName;
-  String category = 'Vegetables';
+  String? category;
   int? quantity;
   String unit = 'kg';
   double? price;
@@ -25,10 +25,33 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
   File? _imageFile;
   bool _isUploading = false;
 
-  final categories = ['Vegetables', 'Fruits', 'Grains'];
-  final units = ['kg', 'dozen', 'litre'];
+  late TextEditingController _categoryController;
 
+  final units = ['kg', 'dozen', 'litre'];
   final picker = ImagePicker();
+
+  // Predefined product-category mapping based on customer home
+  final Map<String, String> productCategoryMap = {
+    'Tomatoes': 'Vegetables',
+    'Spinach': 'Vegetables',
+    'LadyFinger': 'Vegetables',
+    'Bananas': 'Fruits',
+    'Strawberries': 'Fruits',
+    'Rice': 'Grains',
+    'Wheat': 'Grains',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _categoryController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _categoryController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickImage() async {
     final picked = await picker.pickImage(source: ImageSource.gallery);
@@ -38,7 +61,7 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
   }
 
   Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate() || _imageFile == null) {
+    if (!_formKey.currentState!.validate() || _imageFile == null || productName == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please complete all fields')),
       );
@@ -49,9 +72,7 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
     setState(() => _isUploading = true);
 
     try {
-      // Upload the image to Cloudinary
-      String? imageUrl = await uploadImageToCloudinary(_imageFile!); // This comes from cloudinary_service.dart
-
+      String? imageUrl = await uploadImageToCloudinary(_imageFile!);
       if (imageUrl == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Image upload failed')),
@@ -59,7 +80,6 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
         return;
       }
 
-      // Add data to Firestore
       await FirebaseFirestore.instance.collection('inventory').add({
         'productName': productName,
         'category': category,
@@ -71,7 +91,6 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
         'timestamp': FieldValue.serverTimestamp(),
       });
 
-      // On success, go back to previous screen
       Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -115,21 +134,44 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
                 ),
               ),
               const SizedBox(height: 16),
+
+              // Product Name Dropdown
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(
+                  labelText: 'Product Name',
+                  border: OutlineInputBorder(),
+                ),
+                items: productCategoryMap.keys.map((product) {
+                  return DropdownMenuItem(
+                    value: product,
+                    child: Text(product),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    productName = value;
+                    category = productCategoryMap[value];
+                    _categoryController.text = category ?? '';
+                  });
+                },
+                validator: (val) => val == null ? 'Select a product' : null,
+                value: productName,
+              ),
+
+              const SizedBox(height: 12),
+
+              // Auto-filled category field
               TextFormField(
-                decoration: const InputDecoration(labelText: 'Product Name'),
-                onSaved: (val) => productName = val,
-                validator: (val) => val!.isEmpty ? 'Enter a product name' : null,
+                controller: _categoryController,
+                decoration: const InputDecoration(
+                  labelText: 'Category',
+                  border: OutlineInputBorder(),
+                ),
+                readOnly: true,
               ),
+
               const SizedBox(height: 12),
-              DropdownButtonFormField(
-                value: category,
-                items: categories
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                    .toList(),
-                onChanged: (val) => setState(() => category = val!),
-                decoration: const InputDecoration(labelText: 'Category'),
-              ),
-              const SizedBox(height: 12),
+
               Row(
                 children: [
                   Expanded(
@@ -153,14 +195,18 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
                   ),
                 ],
               ),
+
               const SizedBox(height: 12),
+
               TextFormField(
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(labelText: 'Price per unit (₹)'),
                 onSaved: (val) => price = double.tryParse(val!),
                 validator: (val) => val!.isEmpty ? 'Enter price' : null,
               ),
+
               const SizedBox(height: 20),
+
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
