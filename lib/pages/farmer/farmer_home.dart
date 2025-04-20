@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'recent_activity.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'farmer_inventory.dart';
 
 class FarmerHome extends StatefulWidget {
   const FarmerHome({super.key});
@@ -10,6 +11,26 @@ class FarmerHome extends StatefulWidget {
 }
 
 class _FarmerHomeState extends State<FarmerHome> {
+  int? inventoryCount;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchInventoryCount();
+  }
+
+  void fetchInventoryCount() async {
+    final querySnapshot = await FirebaseFirestore.instance
+        .collection('inventory')
+        .where('farmerId', isEqualTo: 'F-100')
+        .get();
+
+    setState(() {
+      inventoryCount = querySnapshot.docs.length;
+    });
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,7 +75,21 @@ class _FarmerHomeState extends State<FarmerHome> {
                 mainAxisSpacing: 12,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  _StatCard(title: "Inventory", value: "12 Items", icon: Icons.store),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const InventoryPage(farmerId: "F-100"),
+                        ),
+                      );
+                    },
+                    child: _StatCard(
+                      title: "Inventory",
+                      value: inventoryCount != null ? "$inventoryCount Items" : "Loading...",
+                      icon: Icons.store,
+                    ),
+                  ),
                   _StatCard(title: "Orders", value: "5 Pending", icon: Icons.receipt_long),
                   _StatCard(title: "Earnings", value: "₹12,300", icon: Icons.attach_money),
                   _StatCard(title: "Top Seller", value: "Tomatoes", icon: Icons.trending_up),

@@ -1,10 +1,9 @@
+// main.dart
 import 'package:flutter/material.dart';
-import 'package:krushi_version16/pages/customer/home.dart'; // Make sure this path is correct
-import 'package:krushi_version16/pages/farmer/farmer_home.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; //cloud firestore db
+import 'pages/role_selection.dart';
 
-void main() async{
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   runApp(const MyApp());
@@ -21,7 +20,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         useMaterial3: true,
       ),
-      home: const FarmerHome(),
+      home: const RoleSelectionPage(), // ← this is for the sake of placeholder
       debugShowCheckedModeBanner: false,
     );
   }
