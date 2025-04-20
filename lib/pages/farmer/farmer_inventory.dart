@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'add_product.dart';
+
 class InventoryPage extends StatelessWidget {
   final String farmerId;
 
@@ -8,20 +9,26 @@ class InventoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final inventoryRef = FirebaseFirestore.instance.collection('inventory');
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("My Inventory"),
         backgroundColor: Colors.green,
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('inventory')
+        stream: inventoryRef
             .where('farmerId', isEqualTo: farmerId)
-            .orderBy('timestamp', descending: true)
-            .snapshots(),
+            .snapshots(), // ✅ Removed orderBy here
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return const Center(
+              child: Text("Error loading data."),
+            );
           }
 
           final docs = snapshot.data?.docs ?? [];
@@ -36,29 +43,52 @@ class InventoryPage extends StatelessWidget {
             );
           }
 
+          // Sort locally by timestamp (if available)
+          docs.sort((a, b) {
+            final aTime = a['timestamp'] as Timestamp?;
+            final bTime = b['timestamp'] as Timestamp?;
+            return (bTime?.millisecondsSinceEpoch ?? 0)
+                .compareTo(aTime?.millisecondsSinceEpoch ?? 0);
+          });
+
           return ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: docs.length,
             itemBuilder: (context, index) {
               final data = docs[index].data() as Map<String, dynamic>;
+
+              final imageUrl = data['imageUrl'] ?? '';
+              final productName = data['productName'] ?? 'Unnamed';
+              final quantity = data['quantity'] ?? 0;
+              final unit = data['unit'] ?? '';
+              final price = data['price'] ?? 0;
+
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 color: Colors.green[50],
                 child: ListTile(
-                  leading: Image.network(
-                    data['imageUrl'] ?? '',
-                    width: 50,
-                    height: 50,
-                    fit: BoxFit.cover,
-                  ),
+                  leading: imageUrl.isNotEmpty
+                      ? ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      imageUrl,
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                      const Icon(Icons.broken_image),
+                    ),
+                  )
+                      : const Icon(Icons.image_not_supported),
                   title: Text(
-                    data['productName'] ?? '',
+                    productName,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   subtitle: Text(
-                      '${data['quantity']} ${data['unit']} • ₹${data['price']} per ${data['unit']}'),
+                      '$quantity $unit • ₹$price per $unit'),
                 ),
               );
             },
@@ -67,7 +97,6 @@ class InventoryPage extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // Navigate to Add Item Page
           Navigator.push(
             context,
             MaterialPageRoute(
