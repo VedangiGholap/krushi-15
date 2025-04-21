@@ -21,16 +21,17 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
   int? quantity;
   String unit = 'kg';
   double? price;
+  bool flexible = false;
 
   File? _imageFile;
   bool _isUploading = false;
 
-  late TextEditingController _categoryController;
+  String? farmerName;
+  String? farmerLocation;
 
   final units = ['kg', 'dozen', 'litre'];
-  final picker = ImagePicker();
 
-  // Predefined product-category mapping based on customer home
+  final picker = ImagePicker();
   final Map<String, String> productCategoryMap = {
     'Tomatoes': 'Vegetables',
     'Spinach': 'Vegetables',
@@ -44,14 +45,28 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
   @override
   void initState() {
     super.initState();
-    _categoryController = TextEditingController();
+    fetchFarmerInfo();
   }
 
-  @override
-  void dispose() {
-    _categoryController.dispose();
-    super.dispose();
+  Future<void> fetchFarmerInfo() async {
+    final querySnapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .where('role', isEqualTo: 'farmer')
+        .limit(1) // just get one farmer (first match)
+        .get();
+
+    if (querySnapshot.docs.isNotEmpty) {
+      final doc = querySnapshot.docs.first;
+      setState(() {
+        farmerName = doc['name'];
+        farmerLocation = doc['location'];
+        // widget.farmerId = doc.id;
+      });
+    } else {
+      debugPrint('No farmer found.');
+    }
   }
+
 
   Future<void> _pickImage() async {
     final picked = await picker.pickImage(source: ImageSource.gallery);
@@ -87,7 +102,10 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
         'unit': unit,
         'price': price,
         'imageUrl': imageUrl,
+        'flexible': flexible,
         'farmerId': widget.farmerId,
+        'farmerName': farmerName,
+        'farmerLocation': farmerLocation,
         'timestamp': FieldValue.serverTimestamp(),
       });
 
@@ -120,11 +138,14 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
                     ? Container(
                   height: 150,
                   width: double.infinity,
-                  color: Colors.green[100],
+                  decoration: BoxDecoration(
+                    color: Colors.green[100],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: const Icon(Icons.add_a_photo, size: 50),
                 )
                     : ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                   child: Image.file(
                     _imageFile!,
                     height: 150,
@@ -135,41 +156,34 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
               ),
               const SizedBox(height: 16),
 
-              // Product Name Dropdown
               DropdownButtonFormField<String>(
                 decoration: const InputDecoration(
                   labelText: 'Product Name',
                   border: OutlineInputBorder(),
                 ),
                 items: productCategoryMap.keys.map((product) {
-                  return DropdownMenuItem(
-                    value: product,
-                    child: Text(product),
-                  );
+                  return DropdownMenuItem(value: product, child: Text(product));
                 }).toList(),
                 onChanged: (value) {
                   setState(() {
                     productName = value;
                     category = productCategoryMap[value];
-                    _categoryController.text = category ?? '';
                   });
                 },
                 validator: (val) => val == null ? 'Select a product' : null,
                 value: productName,
               ),
-
               const SizedBox(height: 12),
 
-              // Auto-filled category field
-              TextFormField(
-                controller: _categoryController,
-                decoration: const InputDecoration(
-                  labelText: 'Category',
-                  border: OutlineInputBorder(),
+              if (category != null)
+                TextFormField(
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Category',
+                    border: OutlineInputBorder(),
+                  ),
+                  initialValue: category,
                 ),
-                readOnly: true,
-              ),
-
               const SizedBox(height: 12),
 
               Row(
@@ -186,16 +200,13 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
                   Expanded(
                     child: DropdownButtonFormField(
                       value: unit,
-                      items: units
-                          .map((u) => DropdownMenuItem(value: u, child: Text(u)))
-                          .toList(),
+                      items: units.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
                       onChanged: (val) => setState(() => unit = val!),
                       decoration: const InputDecoration(labelText: 'Unit'),
                     ),
                   ),
                 ],
               ),
-
               const SizedBox(height: 12),
 
               TextFormField(
@@ -207,6 +218,27 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
 
               const SizedBox(height: 20),
 
+              // Sleek toggle for "Flexible to Bargain"
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.handshake, color: Colors.green),
+                      SizedBox(width: 8),
+                      Text('Flexible to Bargain', style: TextStyle(fontSize: 16)),
+                    ],
+                  ),
+                  Switch(
+                    value: flexible,
+                    onChanged: (val) => setState(() => flexible = val),
+                    activeColor: Colors.green,
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -214,10 +246,7 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
                       ? const SizedBox(
                     height: 16,
                     width: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   )
                       : const Icon(Icons.upload),
                   label: Text(_isUploading ? 'Uploading...' : 'Add to Inventory'),
@@ -225,6 +254,9 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
                     backgroundColor: Colors.green,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     textStyle: const TextStyle(fontSize: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onPressed: _isUploading ? null : _submitForm,
                 ),
