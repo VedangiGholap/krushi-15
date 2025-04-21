@@ -38,7 +38,7 @@ class MainHomeState extends State<MainHome> {
 
   List<Widget> get _pages => [
     buildHomePageContent(),
-    OrdersPage(),
+    CustomerOrdersPage(),
     CartPage(),
     ProfilePage(),
   ];

@@ -1,185 +1,122 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final Map<String, dynamic> productData;
-  final Map<String, dynamic>? farmerData;
+  final Map<String, dynamic> farmerData;
 
-  const ProductDetailPage({
-    super.key,
-    required this.productData,
-    required this.farmerData,
-  });
+  const ProductDetailPage({super.key, required this.productData, required this.farmerData});
 
   @override
-  State<ProductDetailPage> createState() => _ProductDetailPageState();
+  _ProductDetailPageState createState() => _ProductDetailPageState();
 }
 
 class _ProductDetailPageState extends State<ProductDetailPage> {
-  final TextEditingController bidController = TextEditingController();
-  String bargainResult = '';
-
-  String autoBargainDecision({
-    required double priceSetByFarmer,
-    required double costOfProduction,
-    double? msp,
-    required double customerBid,
-  }) {
-    final m = msp != null ? (costOfProduction < msp ? costOfProduction : msp) : costOfProduction;
-    final sp = (msp != null ? (costOfProduction > msp ? costOfProduction : msp) : costOfProduction) + 5;
-
-    if (customerBid >= sp) {
-      return 'Offer Accepted 🎉';
-    } else if (customerBid >= m) {
-      return 'Counter Offer: You\'re close 🤝';
-    } else {
-      return 'Offer Rejected ❌';
-    }
-  }
-
-  void handleMakeOffer() {
-    final bid = double.tryParse(bidController.text);
-    if (bid == null) return;
-
-    final product = widget.productData;
-    final double price = product['price']?.toDouble() ?? 0;
-    final double costOfProduction = product['costOfProduction']?.toDouble() ?? 0;
-    final double? msp = product['msp'] != null ? product['msp'].toDouble() : null;
-
-    final result = autoBargainDecision(
-      priceSetByFarmer: price,
-      costOfProduction: costOfProduction,
-      msp: msp,
-      customerBid: bid,
-    );
-
-    setState(() => bargainResult = result);
-  }
+  int quantity = 1; // Default quantity
 
   @override
   Widget build(BuildContext context) {
     final product = widget.productData;
-    final imageUrl = product['imageUrl'] ?? '';
-    final productName = product['productName'];
-    final price = product['price'];
-    final unit = product['unit'];
-    final quantity = product['quantity'];
-    final flexible = product['flexible'] ?? false;
+    final farmer = widget.farmerData;
 
-    final farmerName = widget.farmerData?['name'] ?? 'Unknown';
-    final farmerLocation = widget.farmerData?['location'] ?? 'Unknown';
+    // Get the unit, price, image URL
+    final unit = product['unit'] ?? 'kg';
+    final price = product['price'] ?? 0;
+    final imageUrl = product['imageUrl'] ?? ''; // Use imageUrl here
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(productName),
+        title: Text('${product['productName']} Details'),
         backgroundColor: Colors.green,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Product Image
             if (imageUrl.isNotEmpty)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(imageUrl),
+              Image.network(
+                imageUrl,
+                height: 200, // Adjust height as needed
+                width: double.infinity,
+                fit: BoxFit.cover,
               ),
             const SizedBox(height: 16),
+
+            // Farmer info
             Text(
-              '$productName - ₹$price/$unit',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              'Farmer: ${farmer['name'] ?? 'Unknown'}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            Text('Available Quantity: $quantity $unit'),
-            const SizedBox(height: 8),
-            Text('Farmer: $farmerName'),
-            Text('Location: $farmerLocation'),
+            Text('Location: ${farmer['location'] ?? 'Unknown'}'),
             const SizedBox(height: 16),
 
-            if (flexible) ...[
-              const Text(
-                'This item is available for bargaining.',
-                style: TextStyle(fontWeight: FontWeight.w500, color: Colors.orange),
-              ),
-              const SizedBox(height: 8),
+            // Product info
+            Text(
+              'Price: ₹$price per $unit',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text('Unit: $unit'),
+            const SizedBox(height: 16),
 
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle_outline),
-                    onPressed: () {
-                      double current = double.tryParse(bidController.text) ?? 0;
-                      if (current > 0) {
-                        bidController.text = (current - 10).toStringAsFixed(0);
-                      }
-                    },
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: bidController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Your Offer Price (₹)',
-                        border: OutlineInputBorder(),
-                        prefixText: '₹ ',
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline),
-                    onPressed: () {
-                      double current = double.tryParse(bidController.text) ?? 0;
-                      bidController.text = (current + 10).toStringAsFixed(0);
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
+            // Quantity selection (Per Unit)
+            Row(
+              children: [
+                const Text('Quantity: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                IconButton(
+                  icon: const Icon(Icons.remove, color: Colors.red),
+                  onPressed: () {
+                    if (quantity > 1) {
+                      setState(() {
+                        quantity--;
+                      });
+                    }
+                  },
+                ),
+                Text('$quantity $unit'),
+                IconButton(
+                  icon: const Icon(Icons.add, color: Colors.green),
+                  onPressed: () {
+                    setState(() {
+                      quantity++;
+                    });
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
 
-              ElevatedButton.icon(
-                icon: const Icon(Icons.local_offer),
-                label: const Text('Make Offer'),
-                onPressed: handleMakeOffer,
+            // Add to Cart button
+            Center(
+              child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  minimumSize: const Size(double.infinity, 48),
-                ),
-              ),
-              const SizedBox(height: 12),
-              if (bargainResult.isNotEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.green[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
-                    bargainResult,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                  ),
+                  backgroundColor: Colors.green,
                 ),
-              const SizedBox(height: 20),
-            ],
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
                 onPressed: () {
+                  final customerId = 'uid2'; // Placeholder customer UID
+
+                  // Add product to cart with selected quantity
+                  FirebaseFirestore.instance.collection('cart').add({
+                    'customerId': customerId,
+                    'productId': product['id'],
+                    'productName': product['productName'],
+                    'price': price, // Use the price variable here
+                    'quantity': quantity,
+                    'timestamp': Timestamp.now(),
+                  });
+
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Item added to cart!')),
+                    SnackBar(content: Text('${product['productName']} x$quantity added to cart!')),
                   );
                 },
-                icon: const Icon(Icons.add_shopping_cart),
-                label: const Text('Add to Cart'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  textStyle: const TextStyle(fontSize: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+                child: const Text("Add to Cart", style: TextStyle(fontSize: 14)),
               ),
             ),
           ],
@@ -188,3 +125,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     );
   }
 }
+
+
+

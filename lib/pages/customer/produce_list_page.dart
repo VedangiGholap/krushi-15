@@ -44,6 +44,7 @@ class ProduceListPage extends StatelessWidget {
               final price = data['price'] ?? 0;
               final unit = data['unit'] ?? 'kg';
               final farmerId = data['farmerId'] ?? '';
+              final imageUrl = data['imageUrl'] ?? ''; // Use imageUrl here
 
               return FutureBuilder<Map<String, dynamic>?>(
                 future: fetchFarmerData(farmerId),
@@ -67,7 +68,9 @@ class ProduceListPage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: ListTile(
-                      leading: const Icon(Icons.agriculture, color: Colors.green, size: 30),
+                      leading: imageUrl.isNotEmpty
+                          ? Image.network(imageUrl, width: 50, height: 50, fit: BoxFit.cover)
+                          : const Icon(Icons.agriculture, color: Colors.green, size: 30),
                       title: Text(
                         farmerName,
                         style: const TextStyle(fontWeight: FontWeight.bold),
@@ -96,3 +99,4 @@ class ProduceListPage extends StatelessWidget {
     );
   }
 }
+
