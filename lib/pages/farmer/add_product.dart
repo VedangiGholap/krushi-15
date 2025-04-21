@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:krushi_version16/cloudinary_service.dart';
+import 'package:krushi_version16/services/msp_service.dart';  // Adjust the import path
 
 class AddInventoryItemPage extends StatefulWidget {
   final String farmerId;
@@ -29,17 +30,19 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
   String? farmerName;
   String? farmerLocation;
 
+  double? costOfProduction;
+  double? msp;
+
   final units = ['kg', 'dozen', 'litre'];
 
-  final picker = ImagePicker();
+  final MspService _mspService = MspService();
+
   final Map<String, String> productCategoryMap = {
-    'Tomatoes': 'Vegetables',
-    'Spinach': 'Vegetables',
-    'LadyFinger': 'Vegetables',
-    'Bananas': 'Fruits',
-    'Strawberries': 'Fruits',
-    'Rice': 'Grains',
-    'Wheat': 'Grains',
+    'Tomato': 'Vegetable',
+    'Potato': 'Vegetable',
+    'Apple': 'Fruit',
+    'Banana': 'Fruit',
+    // Add more products and categories as needed
   };
 
   @override
@@ -60,15 +63,14 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
       setState(() {
         farmerName = doc['name'];
         farmerLocation = doc['location'];
-        // widget.farmerId = doc.id;
       });
     } else {
       debugPrint('No farmer found.');
     }
   }
 
-
   Future<void> _pickImage() async {
+    final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked != null) {
       setState(() => _imageFile = File(picked.path));
@@ -87,6 +89,23 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
     setState(() => _isUploading = true);
 
     try {
+      // Fetch the MSP before proceeding with the form submission
+      final double fetchedMsp = await _mspService.fetchMSP(productName!);
+      setState(() {
+        msp = fetchedMsp; // Set the MSP value
+      });
+
+      // 🧠 Calculate thresholdPrice (auto-accept floor) using msp and costOfProduction
+      final double effectiveMSP = msp ?? 0.0;
+      final double costOfProductionForPrice = costOfProduction ?? 0;
+
+      final double minFloor = (costOfProductionForPrice < effectiveMSP)
+          ? costOfProductionForPrice
+          : effectiveMSP;
+
+      final double thresholdPrice = costOfProductionForPrice + 5; // Your business logic here
+
+      // Upload the image to Cloudinary
       String? imageUrl = await uploadImageToCloudinary(_imageFile!);
       if (imageUrl == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -95,6 +114,7 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
         return;
       }
 
+      // Add data to Firestore
       await FirebaseFirestore.instance.collection('inventory').add({
         'productName': productName,
         'category': category,
@@ -103,6 +123,10 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
         'price': price,
         'imageUrl': imageUrl,
         'flexible': flexible,
+        'costOfProduction': costOfProduction,
+        'msp': effectiveMSP, // Set the MSP value
+        'thresholdPrice': thresholdPrice,
+        'minFloorPrice': minFloor,
         'farmerId': widget.farmerId,
         'farmerName': farmerName,
         'farmerLocation': farmerLocation,
@@ -173,6 +197,7 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
                 validator: (val) => val == null ? 'Select a product' : null,
                 value: productName,
               ),
+
               const SizedBox(height: 12),
 
               if (category != null)
@@ -211,31 +236,39 @@ class _AddInventoryItemPageState extends State<AddInventoryItemPage> {
 
               TextFormField(
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Price per unit (₹)'),
-                onSaved: (val) => price = double.tryParse(val!),
-                validator: (val) => val!.isEmpty ? 'Enter price' : null,
+                decoration: const InputDecoration(labelText: 'Cost of Production (₹)'),
+                onSaved: (val) => costOfProduction = double.tryParse(val!),
+                validator: (val) => val!.isEmpty ? 'Enter cost of production' : null,
               ),
+              const SizedBox(height: 12),
 
-              const SizedBox(height: 20),
+              TextFormField(
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Minimum Support Price (₹, optional)'),
+                onSaved: (val) => msp = double.tryParse(val!),
+              ),
+              const SizedBox(height: 12),
 
               // Sleek toggle for "Flexible to Bargain"
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: const [
-                      Icon(Icons.handshake, color: Colors.green),
-                      SizedBox(width: 8),
-                      Text('Flexible to Bargain', style: TextStyle(fontSize: 16)),
-                    ],
-                  ),
-                  Switch(
-                    value: flexible,
-                    onChanged: (val) => setState(() => flexible = val),
-                    activeColor: Colors.green,
-                  ),
-                ],
-              ),
+              if (flexible) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.handshake, color: Colors.green),
+                        SizedBox(width: 8),
+                        Text('Flexible to Bargain', style: TextStyle(fontSize: 16)),
+                      ],
+                    ),
+                    Switch(
+                      value: flexible,
+                      onChanged: (val) => setState(() => flexible = val),
+                      activeColor: Colors.green,
+                    ),
+                  ],
+                ),
+              ],
 
               const SizedBox(height: 20),
 

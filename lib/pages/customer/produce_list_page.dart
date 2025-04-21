@@ -80,12 +80,11 @@ class ProduceListPage extends StatelessWidget {
                           MaterialPageRoute(
                             builder: (context) => ProductDetailPage(
                               productData: data,
-                              farmerData: farmerData,
+                              farmerData: farmerData ?? {},
                             ),
                           ),
                         );
                       },
-
                     ),
                   );
                 },

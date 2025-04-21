@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-
-class ProductDetailPage extends StatelessWidget {
-
+class ProductDetailPage extends StatefulWidget {
   final Map<String, dynamic> productData;
   final Map<String, dynamic>? farmerData;
 
@@ -13,16 +11,62 @@ class ProductDetailPage extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final imageUrl = productData['imageUrl'] ?? '';
-    final productName = productData['productName'];
-    final price = productData['price'];
-    final unit = productData['unit'];
-    final quantity = productData['quantity'];
-    final flexible = productData['flexible'] ?? false;
+  State<ProductDetailPage> createState() => _ProductDetailPageState();
+}
 
-    final farmerName = farmerData?['name'] ?? 'Unknown';
-    final farmerLocation = farmerData?['location'] ?? 'Unknown';
+class _ProductDetailPageState extends State<ProductDetailPage> {
+  final TextEditingController bidController = TextEditingController();
+  String bargainResult = '';
+
+  String autoBargainDecision({
+    required double priceSetByFarmer,
+    required double costOfProduction,
+    double? msp,
+    required double customerBid,
+  }) {
+    final m = msp != null ? (costOfProduction < msp ? costOfProduction : msp) : costOfProduction;
+    final sp = (msp != null ? (costOfProduction > msp ? costOfProduction : msp) : costOfProduction) + 5;
+
+    if (customerBid >= sp) {
+      return 'Offer Accepted 🎉';
+    } else if (customerBid >= m) {
+      return 'Counter Offer: You\'re close 🤝';
+    } else {
+      return 'Offer Rejected ❌';
+    }
+  }
+
+  void handleMakeOffer() {
+    final bid = double.tryParse(bidController.text);
+    if (bid == null) return;
+
+    final product = widget.productData;
+    final double price = product['price']?.toDouble() ?? 0;
+    final double costOfProduction = product['costOfProduction']?.toDouble() ?? 0;
+    final double? msp = product['msp'] != null ? product['msp'].toDouble() : null;
+
+    final result = autoBargainDecision(
+      priceSetByFarmer: price,
+      costOfProduction: costOfProduction,
+      msp: msp,
+      customerBid: bid,
+    );
+
+    setState(() => bargainResult = result);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final product = widget.productData;
+    final imageUrl = product['imageUrl'] ?? '';
+    final productName = product['productName'];
+    final price = product['price'];
+    final unit = product['unit'];
+    final quantity = product['quantity'];
+    final flexible = product['flexible'] ?? false;
+
+    final farmerName = widget.farmerData?['name'] ?? 'Unknown';
+    final farmerLocation = widget.farmerData?['location'] ?? 'Unknown';
 
     return Scaffold(
       appBar: AppBar(
@@ -50,31 +94,78 @@ class ProductDetailPage extends StatelessWidget {
             Text('Farmer: $farmerName'),
             Text('Location: $farmerLocation'),
             const SizedBox(height: 16),
-            if (flexible)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+
+            if (flexible) ...[
+              const Text(
+                'This item is available for bargaining.',
+                style: TextStyle(fontWeight: FontWeight.w500, color: Colors.orange),
+              ),
+              const SizedBox(height: 8),
+
+              Row(
                 children: [
-                  const Text(
-                    'This item is available for bargaining.',
-                    style: TextStyle(fontWeight: FontWeight.w500, color: Colors.orange),
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline),
+                    onPressed: () {
+                      double current = double.tryParse(bidController.text) ?? 0;
+                      if (current > 0) {
+                        bidController.text = (current - 10).toStringAsFixed(0);
+                      }
+                    },
                   ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Your Offer Price (₹)',
-                      border: OutlineInputBorder(),
-                      prefixText: '₹ ',
+                  Expanded(
+                    child: TextField(
+                      controller: bidController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Your Offer Price (₹)',
+                        border: OutlineInputBorder(),
+                        prefixText: '₹ ',
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline),
+                    onPressed: () {
+                      double current = double.tryParse(bidController.text) ?? 0;
+                      bidController.text = (current + 10).toStringAsFixed(0);
+                    },
+                  ),
                 ],
               ),
+              const SizedBox(height: 12),
+
+              ElevatedButton.icon(
+                icon: const Icon(Icons.local_offer),
+                label: const Text('Make Offer'),
+                onPressed: handleMakeOffer,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  minimumSize: const Size(double.infinity, 48),
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (bargainResult.isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green),
+                  ),
+                  child: Text(
+                    bargainResult,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              const SizedBox(height: 20),
+            ],
+
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  // Handle add to cart logic here
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Item added to cart!')),
                   );
